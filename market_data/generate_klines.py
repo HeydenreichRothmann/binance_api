@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import os
+import time
+import sys
 import json
 import logging
+from pathlib import Path
 from typing import Any, Iterable
 from datetime import datetime, timezone
 
@@ -27,15 +30,27 @@ logging.basicConfig(
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-
 # =============================================================================
 # PATH SETUP
 # =============================================================================
 
-BASE_DIRECTORY: str = os.path.dirname(os.path.abspath(__file__))
-DATA_DIRECTORY: str = os.path.join(BASE_DIRECTORY, "data")
 
-os.makedirs(DATA_DIRECTORY, exist_ok=True)
+def get_runtime_dir() -> Path:
+    """
+    Directory where the executable lives.
+    - Source run: folder of this file
+    - PyInstaller onefile: folder of the .exe
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
+    return Path(__file__).resolve().parent
+
+
+RUNTIME_DIR = get_runtime_dir()
+DATA_DIRECTORY = RUNTIME_DIR / "data"
+
+DATA_DIRECTORY.mkdir(parents=True, exist_ok=True)
+
 logger.info("Data directory ready: %s", DATA_DIRECTORY)
 
 
@@ -43,34 +58,62 @@ logger.info("Data directory ready: %s", DATA_DIRECTORY)
 # CONFIGURATION LOADING
 # =============================================================================
 
-CONFIG_PATH: str = os.path.join(BASE_DIRECTORY, "config.json")
+def get_runtime_dir() -> Path:
+    """
+    Returns the directory the program is running from.
+    - When frozen (PyInstaller): directory of the executable
+    - When running from source: directory of this file
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
+    return Path(__file__).parent
+
+
+RUNTIME_DIR = get_runtime_dir()
+CONFIG_PATH = RUNTIME_DIR / "config.json"
 
 logger.info("Loading configuration from %s", CONFIG_PATH)
 
-try:
-    with open(CONFIG_PATH, "r", encoding="utf-8") as config_file:
-        config: dict[str, Any] = json.load(config_file)
 
-except FileNotFoundError:
+# ---- Load config file ----
+if not CONFIG_PATH.exists():
     logger.critical("Config file not found: %s", CONFIG_PATH)
-    raise
+    logger.critical("Copy config_template.json and rename it to config.json")
+    sys.exit(1)
 
+try:
+    with CONFIG_PATH.open("r", encoding="utf-8") as f:
+        config: dict = json.load(f)
 except json.JSONDecodeError as exc:
-    logger.critical("Invalid JSON in config file: %s", exc)
-    raise
+    logger.critical("Invalid JSON in config.json: %s", exc)
+    sys.exit(1)
 
+
+# ---- Validate required keys ----
+REQUIRED_KEYS = ["api_key", "api_secret", "trading_pair"]
+
+missing_keys = [k for k in REQUIRED_KEYS if k not in config]
+if missing_keys:
+    logger.critical("Missing required config keys: %s", ", ".join(missing_keys))
+    sys.exit(1)
+
+
+# ---- Validate trading pairs ----
+trading_pairs = config.get("trading_pair", [])
+
+if not isinstance(trading_pairs, list) or not trading_pairs:
+    logger.critical("'trading_pair' must be a non-empty list in config.json")
+    sys.exit(1)
+
+
+# ---- Final confirmation ----
 logger.info(
     "Configuration loaded (api_key_present=%s, api_secret_present=%s)",
     bool(config.get("api_key")),
     bool(config.get("api_secret")),
 )
-
-trading_pairs: list[str] = config.get("trading_pair")
-
-if not isinstance(trading_pairs, list) or not trading_pairs:
-    raise ValueError("'trading_pair' must be a non-empty list in config.json")
-
 logger.info("Trading pairs configured: %s", ", ".join(trading_pairs))
+
 
 
 # =============================================================================
@@ -100,6 +143,17 @@ except Exception as exc:
         exc_info=True,
     )
     raise RuntimeError("Invalid Binance API credentials") from exc
+
+
+
+
+
+
+
+
+
+
+
 
 
 # =============================================================================
