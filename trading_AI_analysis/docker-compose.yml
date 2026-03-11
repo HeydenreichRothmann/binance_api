@@ -1,0 +1,258 @@
+# version: '3.3'
+
+services:
+  # docker-compose run --rm nessus_pro
+    nessus_pro:
+        image: fire_scripts_builder:${PYTHON_VERSION}
+        build:
+            context: .
+            dockerfile: Dockerfile.${PIP_VERSION}
+
+        environment:
+            - LD_LIBRARY_PATH:/usr/local/lib/
+
+        working_dir: /builder
+        volumes:
+            - ./fire_api:/fire_api
+            - ./nessus_pro:/builder
+            - ./dist/nessus_pro:/dist
+
+        command: bash -c "
+                pip${PIP_VERSION} install --root-user-action=ignore --upgrade pip &&
+                pip${PIP_VERSION} install --root-user-action=ignore -r requirements.txt &&
+                pyinstaller ./src/nessus_pro.py \
+                    --name nessus_pro \
+                    --onefile \
+                    --clean \
+                    --workpath ./build/ \
+                    --distpath /dist &&
+                cp ./src/config_template.json /dist"       
+
+  # docker-compose run --rm tenable_io
+    tenable_io:
+        image: fire_scripts_builder:${PYTHON_VERSION}
+        build:
+            context: .
+            dockerfile: Dockerfile.${PIP_VERSION}
+
+        working_dir: /builder
+        volumes:
+            - ./fire_api:/fire_api
+            - ./tenable_io:/builder
+            - ./dist/tenable_io:/dist
+        
+        command: bash -c "
+                pip${PIP_VERSION} install --root-user-action=ignore --upgrade pip &&
+                pip${PIP_VERSION} install --root-user-action=ignore -r requirements.txt &&
+                pyinstaller ./src/tenable_io.py \
+                    --name tenable_io \
+                    --onefile \
+                    --clean \
+                    --workpath ./build/ --distpath /dist &&
+                cp ./src/config_template.json /dist"       
+
+  # docker-compose run --rm malops
+    malops:
+        image: fire_scripts_builder:${PYTHON_VERSION}
+        build:
+            context: .
+            dockerfile: Dockerfile.${PIP_VERSION}
+
+        working_dir: /builder
+        volumes:
+            - ./fire_api:/fire_api
+            - ./cybereason:/builder
+            - ./dist/cybereason:/dist
+        
+        command: bash -c "
+                pip${PIP_VERSION} install --root-user-action=ignore --upgrade pip &&
+                pip${PIP_VERSION} install --root-user-action=ignore -r requirements.txt &&
+                pyinstaller ./cybereason/malops.py \
+                    --name malops \
+                    --onefile \
+                    --clean \
+                    --workpath ./build/ \
+                    --distpath /dist && 
+                cp ./cybereason/config_template.json /dist"       
+
+# docker-compose run --rm fortigateConfigBackup
+    fortigateConfigBackup:
+        image: fire_scripts_builder:${PYTHON_VERSION}
+        build:
+            context: .
+            dockerfile: Dockerfile.${PIP_VERSION}
+
+        working_dir: /builder
+        volumes:
+            - ./fire_api:/fire_api
+            - ./fortigateConfig:/builder
+            - ./dist/fortigateConfig:/dist
+        
+        command: bash -c "
+                pip${PIP_VERSION} install --root-user-action=ignore --upgrade pip &&
+                pip${PIP_VERSION} install --root-user-action=ignore -r requirements.txt &&
+                pyinstaller ./fortigateConfig/fortigateConfigBackup.py \
+                    --name fortigateConfigBackup \
+                    --onefile \
+                    --clean \
+                    --workpath ./build/ \
+                    --distpath /dist && 
+                cp ./fortigateConfig/config_template.json /dist"
+
+# docker-compose run --rm fortigateConfigBackup
+    mcafee_epo:
+        image: fire_scripts_builder:${PYTHON_VERSION}
+        build:
+            context: .
+            dockerfile: Dockerfile.${PIP_VERSION}
+
+        working_dir: /builder
+        volumes:
+            - ./fire_api:/fire_api
+            - ./mcafee_epo_compliance:/builder
+            - ./dist/mcafee_epo_compliance:/dist
+        
+        command: bash -c "
+                pip${PIP_VERSION} install --root-user-action=ignore --upgrade pip &&
+                pip${PIP_VERSION} install --root-user-action=ignore -r requirements.txt &&
+                pyinstaller ./mcafee_epo_compliance/mcafee_epo.py \
+                    --add-data ./mcafee_epo_compliance/socks.py:. \
+                    --name mcafee_epo \
+                    --onefile \
+                    --clean \
+                    --workpath ./build/ \
+                    --distpath /dist && 
+                cp ./mcafee_epo_compliance/config_template.json /dist"
+
+  # docker-compose run --rm tenable_sc
+    tenable_sc:
+        image: fire_scripts_builder:${PYTHON_VERSION}
+        build:
+            context: .
+            dockerfile: Dockerfile.${PIP_VERSION}
+
+        working_dir: /builder
+        volumes:
+            - ./fire_api:/fire_api
+            - ./tenable_sc:/builder
+            - ./dist/tenable_sc:/dist
+        
+        command: bash -c "
+                pip${PIP_VERSION} install --root-user-action=ignore --upgrade pip && 
+                pip${PIP_VERSION} install --root-user-action=ignore -r requirements.txt && 
+                pyinstaller ./src/tenable_sc.py \
+                    --name tenable_sc \
+                    --onefile \
+                    --clean \
+                    --workpath ./build/ \
+                    --distpath /dist && 
+                cp ./src/config_template.json /dist"
+
+
+      # docker compose run --rm netskope
+    netskope:
+        image: fire_scripts_builder:${PYTHON_VERSION}
+        build:
+            context: .
+            dockerfile: Dockerfile.${PIP_VERSION}
+
+        working_dir: /builder
+        volumes:
+            - ./fire_api:/fire_api
+            - ./netskope:/builder
+            - ./dist/netskope:/dist
+        
+        command: bash -c "
+                pip${PIP_VERSION} install --root-user-action=ignore --upgrade pip && 
+                pip${PIP_VERSION} install --root-user-action=ignore -r requirements.txt && 
+                pyinstaller ./src/netskope_logs.py \
+                    --name netskope \
+                    --onefile \
+                    --clean \
+                    --workpath ./build/ \
+                    --distpath /dist && 
+                cp ./src/config_template.json /dist"
+
+      # docker compose run --rm sophos
+    sophos:
+        image: fire_scripts_builder:${PYTHON_VERSION}
+        build:
+            context: .
+            dockerfile: Dockerfile.${PIP_VERSION}
+
+        working_dir: /builder
+        volumes:
+            - ./fire_api:/fire_api
+            - ./sophos:/builder
+            - ./dist/sophos:/dist
+        
+        command: bash -c "
+                pip${PIP_VERSION} install --root-user-action=ignore --upgrade pip && 
+                pip${PIP_VERSION} install --root-user-action=ignore -r requirements.txt && 
+                pyinstaller ./src/sophos_log_collector.py \
+                    --name sophos \
+                    --onefile \
+                    --clean \
+                    --workpath ./build/ \
+                    --distpath /dist && 
+                cp ./src/config_template.json /dist"
+
+
+    # docker-compose run --rm template
+    template:
+        image: fire_scripts_builder:${PYTHON_VERSION}
+        build:
+            context: .
+            dockerfile: Dockerfile.${PIP_VERSION}
+
+        working_dir: /builder
+        volumes:
+            - ./template:/builder
+            - ./fire_api:/fire_api
+            - ./script_utils:/builder/src/script_utils
+            - ./dist/template:/dist
+        
+        command: bash -c "
+            pip${PIP_VERSION} install --root-user-action=ignore --upgrade pip &&
+            pip${PIP_VERSION} install --root-user-action=ignore -r requirements.txt &&
+            pyinstaller ./src/template_script.py \
+                --name template \
+                --onefile \
+                --clean \
+                --workpath ./build/ \
+                --distpath /dist \
+                --paths=./src \
+                --paths=./script_utils/src \
+                --hidden-import=logstash_async.transport &&
+            cp ./src/config_template.json /dist"
+
+
+
+
+    # docker-compose run --rm sentinal_one
+    sentinal_one:
+        image: fire_scripts_builder:${PYTHON_VERSION}
+        build:
+            context: .
+            dockerfile: Dockerfile.${PIP_VERSION}
+
+        working_dir: /builder
+        volumes:
+            - ./sentinal_one:/builder
+            - ./fire_api:/fire_api
+            - ./script_utils:/builder/src/script_utils
+            - ./dist/sentinal_one:/dist
+        
+        command: bash -c "
+            pip${PIP_VERSION} install --root-user-action=ignore --upgrade pip &&
+            pip${PIP_VERSION} install --root-user-action=ignore -r requirements.txt &&
+            pyinstaller ./src/sentinal_one.py \
+                --name sentinal_one \
+                --onefile \
+                --clean \
+                --workpath ./build/ \
+                --distpath /dist \
+                --paths=./src \
+                --paths=./script_utils/src \
+                --hidden-import=logstash_async.transport &&
+            cp ./src/config_template.json /dist"

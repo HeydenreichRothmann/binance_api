@@ -1,0 +1,36 @@
+FROM ubuntu:18.04
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+USER root
+RUN apt-get update
+RUN apt-get -y upgrade
+RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends --fix-missing \
+    make build-essential libssl-dev zlib1g-dev libffi-dev \
+    libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm \
+    libncurses5-dev libncursesw5-dev xz-utils tk-dev nano python3-dev
+
+RUN wget https://www.python.org/ftp/python/3.12.9/Python-3.12.9.tgz --no-check-certificate && \
+tar xvf Python-3.12.9.tgz && \
+cd Python-3.12.9 && \
+./configure --enable-optimizations --with-ensurepip=install --enable-shared && \
+# ./configure --enable-optimizations --with-ensurepip=install --enable-shared --prefix=/opt/python LDFLAGS=-Wl,-rpath=/opt/python/lib && \
+make -j 8 && \
+make altinstall
+
+# we will need python3.8 dev to build scripts with pyinstaller
+# RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends --fix-missing python3.10-dev
+
+# COPY requirements.txt requirements.txt
+# RUN pip3 install -r requirements.txt
+
+ENV LD_LIBRARY_PATH="/usr/local/lib/"
+# RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/ \
+RUN python3.12 -m pip install --upgrade pip \
+&& pip3.12 install pyinstaller pipenv
+
+RUN mkdir /builder \
+    && echo ./venv >/builder/.venv
+
+# WORKDIR /builder \
