@@ -1,6 +1,11 @@
-import os
 from openai import OpenAI
 from pathlib import Path
+import re
+
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import cm
 
 # =============================================================================
 # CONFIGURATION
@@ -8,66 +13,86 @@ from pathlib import Path
 
 
 OPENAI_API_KEY: str = ""
-
-if not OPENAI_API_KEY:
-    raise RuntimeError("OPENAI_API_KEY environment variable not set")
-
 MODEL_NAME: str = "gpt-5.1"
 
-INPUT_PDF_PATH: Path = Path( "data.pdf" )
-
+INPUT_PDF_PATH: Path = Path("data.pdf")
 OUTPUT_MARKDOWN_PATH: Path = Path("chat_gpt_output.md")
+OUTPUT_PDF_PATH: Path = Path("chat_gpt_output.pdf")
+
+if not OPENAI_API_KEY:
+    raise RuntimeError("OPENAI_API_KEY not set")
 
 # =============================================================================
-# CLIENT INITIALIZATION
+# CLIENT
 # =============================================================================
 
-client: OpenAI = OpenAI(api_key=OPENAI_API_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # =============================================================================
-# STEP 1 — Upload PDF
+# STEP 1 — UPLOAD INPUT PDF
 # =============================================================================
 
-with INPUT_PDF_PATH.open("rb") as pdf_file:
+with INPUT_PDF_PATH.open("rb") as f:
     uploaded_file = client.files.create(
-        file=pdf_file,
+        file=f,
         purpose="assistants",
     )
 
 file_id: str = uploaded_file.id
-print(f"Uploaded PDF file_id={file_id}")
+print(f"Uploaded PDF: {file_id}")
 
 # =============================================================================
-# STEP 2 — Send analysis request
+# STEP 2 — ANALYSIS PROMPT
 # =============================================================================
 
 analysis_prompt: str = """
 You are acting as a senior institutional crypto trader and quantitative analyst.
 
-Rules you must follow strictly:
-- Base your analysis ONLY on the candle data visible in the provided document
-- Do NOT assume indicators that are not explicitly present
-- Do NOT invent volume profiles, order book data, or external context
-- If information is insufficient, state that clearly
+Your analysis must prioritize the most recent price action.
+Earlier candles may be referenced only to explain the current structure.
 
-Your task:
-- Identify the dominant market regime (trend, range, transition)
-- Highlight obvious support and resistance zones
-- Comment on volume behavior relative to price movement
-- Call out any notable structural patterns (breaks, compressions, expansions)
-- Assign a confidence score (1–100%) to your analysis
+STRICT CONSTRAINTS:
+- Use ONLY the candle data provided
+- Do NOT assume indicators, sentiment, order flow, or external context
+- If the data does not justify a trade bias, say so explicitly
 
-Tone:
-- Professional
-- Direct
-- No hype
-- No retail-style language
+OBJECTIVE:
+Produce a **trade-readiness assessment** that explains *why* a professional would or would not act here.
 
-Output format:
-- Markdown
-- Clear section headings
-- Concise bullet points
+OUTPUT STRUCTURE:
+
+## Market Context
+- Describe the current regime (trend / range / transition)
+- 2–3 bullets explaining how recent price action led to this state
+
+## Structure & Levels
+- Key support and resistance zones
+- What price has respected or failed recently
+- Why these levels matter *now*
+
+## Price–Volume Behavior
+- How volume is behaving relative to recent price moves
+- What this confirms or fails to confirm
+
+## Decision
+- Bias: Long / Short / No-trade
+- One concise paragraph explaining the decision logic
+- One clear invalidation level
+
+## Confidence
+- 0–100% confidence score
+- If below 60%, bias MUST be “No-trade”
+
+STYLE RULES:
+- No storytelling
+- No hindsight narration
+- Insight over description
+- Brevity over completeness
 """
+
+# =============================================================================
+# STEP 3 — REQUEST ANALYSIS
+# =============================================================================
 
 response = client.responses.create(
     model=MODEL_NAME,
@@ -85,8 +110,66 @@ response = client.responses.create(
 analysis_text: str = response.output_text
 
 # =============================================================================
-# STEP 3 — Persist output
+# STEP 4 — WRITE MARKDOWN
 # =============================================================================
 
 OUTPUT_MARKDOWN_PATH.write_text(analysis_text, encoding="utf-8")
-print(f"Analysis written to {OUTPUT_MARKDOWN_PATH.resolve()}")
+print(f"Markdown written to {OUTPUT_MARKDOWN_PATH.resolve()}")
+
+# =============================================================================
+# STEP 5 — MARKDOWN → STYLED PDF (LIGHT PARSER)
+# =============================================================================
+
+def markdown_to_pdf(text: str, output_path: Path) -> None:
+    styles = getSampleStyleSheet()
+
+    heading_style = ParagraphStyle(
+        "Heading",
+        parent=styles["Heading2"],
+        spaceAfter=12,
+    )
+
+    body_style = ParagraphStyle(
+        "Body",
+        parent=styles["Normal"],
+        spaceAfter=8,
+    )
+
+    doc = SimpleDocTemplate(
+        str(output_path),
+        pagesize=A4,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
+
+    elements = []
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+
+        if not line:
+            elements.append(Spacer(1, 10))
+            continue
+
+        # Headings (##)
+        if line.startswith("## "):
+            content = line.replace("## ", "", 1)
+            elements.append(Paragraph(content, heading_style))
+            continue
+
+        # Escape XML
+        line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        # Inline markdown
+        line = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", line)
+        line = re.sub(r"\*(.*?)\*", r"<i>\1</i>", line)
+
+        elements.append(Paragraph(line, body_style))
+
+    doc.build(elements)
+
+
+markdown_to_pdf(analysis_text, OUTPUT_PDF_PATH)
+print(f"PDF written to {OUTPUT_PDF_PATH.resolve()}")
