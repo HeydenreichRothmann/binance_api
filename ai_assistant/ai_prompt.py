@@ -6,6 +6,7 @@ from pathlib import Path
 # CONFIGURATION
 # =============================================================================
 
+
 OPENAI_API_KEY: str = ""
 
 if not OPENAI_API_KEY:
